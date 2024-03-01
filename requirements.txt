@@ -1,4 +1,13 @@
+certifi==2024.2.2
+charset-normalizer==3.3.2
 confluent-kafka==2.3.0
+idna==3.6
+iniconfig==2.0.0
+packaging==23.2
+pluggy==1.4.0
 py4j==0.10.9.7
 pyspark==3.5.1
+pytest==8.0.2
+requests==2.31.0
 simplejson==3.19.2
+urllib3==2.2.1

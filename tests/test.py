@@ -1,5 +1,6 @@
-import random
 import math
+import time
+import random
 
 SEATTLE_COORDINATES = {"latitude": 47.608013, "longitude": -122.335167}
 UNIVERSITY_COORDINATES = {"latitude": 46.7252, "longitude": -117.1596}
@@ -170,7 +171,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 # coordinates = route['routes'][0]['geometry']['coordinates']
 # for coord in coordinates:
 #     print(coord)
-import time
+
 
 def simulate_dynamic_journey_fine_grained(start_lat, start_lon, end_lat, end_lon, total_distance_km, total_time_sec):
     current_lat, current_lon = start_lat, start_lon
@@ -222,8 +223,7 @@ def simulate_dynamic_journey_fine_grained(start_lat, start_lon, end_lat, end_lon
 
 
 
-import math
-import time
+
 
 def calculate_current_rate(start_rate, target_rate, transition_duration, elapsed_time):
     """
@@ -245,20 +245,19 @@ def calculate_current_rate(start_rate, target_rate, transition_duration, elapsed
     b = math.log(start_rate / target_rate) / transition_duration
 
     # Apply the exponential decay formula
-    current_rate = start_rate * math.exp(-b * elapsed_time)
+    # The formula is adjusted to ensure a smooth transition that doesn't overshoot the target rate
+    current_rate = (start_rate - target_rate) * math.exp(-b * elapsed_time) + target_rate
+
 
     # Clamping the current_rate to ensure it doesn't overshoot in either direction
     if start_rate < target_rate:
         # Acceleration case: Ensure we don't exceed the target rate
-        current_rate = min(current_rate, target_rate)
+        current_rate = int(min(current_rate, target_rate))
     else:
         # Deceleration case: Ensure we don't fall below the target rate
-        current_rate = max(current_rate, target_rate)
+        current_rate = int(max(current_rate, target_rate))
 
     return current_rate
-
-
-
 
 
 def simulate_rate_change(start_rate_ms, target_rate_ms, transition_duration, total_duration):
@@ -282,32 +281,69 @@ def simulate_rate_change(start_rate_ms, target_rate_ms, transition_duration, tot
 # simulate_rate_change(100, 400, 10, 60)
 
 def generate_change_intervals(total_duration_sec, initial_stable_period_sec=10, change_window_size=10):
-    """
-    Generates a list of dictionaries indicating when changes should occur and whether each change is an acceleration or deceleration.
-    """
+    # Calculate the maximum number of 10-second windows available for changes after the initial stable period
     max_changes = (total_duration_sec - initial_stable_period_sec) // change_window_size
-    num_changes = random.randint(1, max(max_changes, 1))
-    intervals = random.sample(range(2, max_changes + 2), num_changes)
-    
+    # Ensure at least one change if the duration allows, but not more than the maximum possible changes
+    num_changes = random.randint(1, max(1, min(max_changes, 5)))  # Adjust '5' as needed to the desired max number of changes
+
     change_intervals = []
-    for interval in intervals:
-        change_type = random.choice(['accelerate', 'decelerate'])
-        change_intervals.append({change_type: interval})
+    # If there are available windows for changes, generate the intervals
+    if max_changes > 0:
+        intervals = random.sample(range(2, max_changes + 2), num_changes)
+        for interval in intervals:
+            change_type = random.choice(['accelerate', 'decelerate'])
+            change_intervals.append({change_type: interval - 1})
+    else:
+        # Handle scenario where no changes can be accommodated
+        print("Warning: Duration too short for any changes.")
+
+    return sorted(change_intervals, key=lambda x: list(x.values())[0])
+
+
+def print_at_rate(start_time, current_rate_ms, message="Printing at the machine's rate..."):
+    """
+    Prints a message at the specified interval rate along with the current time and rate.
     
-    return sorted(change_intervals, key=lambda x: list(x.values()))
-
-def print_at_rate(interval_ms, message="Printing at the machine's rate..."):
+    Parameters:
+    - start_time: The timestamp when the simulation or rate change started.
+    - current_rate_ms: The current rate in milliseconds at which messages are printed.
+    - message: A custom message to print.
     """
-    Prints a message at the specified interval rate.
+    elapsed_time = time.time() - start_time  # Calculate elapsed time since the start
+    print(f"{message} | Interval: {current_rate_ms:.2f}ms | Elapsed Time: {elapsed_time:.2f}s | Current Rate: {current_rate_ms}ms")
+    time.sleep(current_rate_ms / 1000)
+
+
+def get_validated_input(prompt, data_type=int, min_value=None, max_value=None):
     """
-    print(f"{message} Interval: {interval_ms:.2f}ms")
-    time.sleep(interval_ms / 1000)
+    Prompts the user for input, validating the input type and range.
 
+    Parameters:
+    - prompt (str): The message displayed to the user.
+    - data_type: The type of data expected (default: int).
+    - min_value: The minimum acceptable value (if applicable).
+    - max_value: The maximum acceptable value (if applicable).
 
-
-
-
-
+    Returns:
+    - The validated user input, converted to the specified data type.
+    """
+    while True:
+        user_input = input(prompt)
+        try:
+            value = data_type(user_input)
+            if (min_value is not None and value < min_value) or (max_value is not None and value > max_value):
+                raise ValueError
+            return value
+        except ValueError:
+            print(f"Invalid input. Please enter a {data_type.__name__} value", end="")
+            if min_value is not None and max_value is not None:
+                print(f" between {min_value} and {max_value}.")
+            elif min_value is not None:
+                print(f" greater than {min_value}.")
+            elif max_value is not None:
+                print(f" less than {max_value}.")
+            else:
+                print(".")
 
 """
 A given scenario dynamically rate changes:
@@ -329,3 +365,65 @@ we start at 0 to 10 and total time is 60 seconds
 - acceleration and deceleration are random
 - the transition is exponential using exponential decay formula
 """
+
+
+# Reuse calculate_current_rate, generate_change_intervals, print_at_rate, and get_validated_input as provided
+
+def simulate_dynamic_changes(total_duration_sec=60):
+    # Initialize simulation parameters
+    initial_rate_ms = 1000  # Starting with a slower rate
+    stable_rate_ms = 400  # Target stable rate after initial acceleration
+    transition_duration = 6  # Duration for each rate change
+    initial_stable_period_sec = 10  # Duration to stabilize at the beginning
+
+    # Generate change intervals with types (accelerate/decelerate)
+    change_events = generate_change_intervals(total_duration_sec, initial_stable_period_sec)
+    print(">>>>>>>   Change Events:", change_events)
+
+    start_time = time.time()
+    current_rate_ms = initial_rate_ms
+    last_change_time = start_time
+
+    # Initial acceleration to stable_rate_ms
+    while True:
+        # current_rate_ms = 1000
+        elapsed_time = time.time() - start_time
+        if elapsed_time <= transition_duration:
+            current_rate_ms = calculate_current_rate(initial_rate_ms, stable_rate_ms, transition_duration, elapsed_time)
+        else:
+            current_rate_ms = stable_rate_ms
+        if int(elapsed_time) >= 10:
+            print_at_rate(start_time, current_rate_ms)
+            break
+        print_at_rate( start_time,current_rate_ms)
+
+    # # Process each change event
+    # for event in change_events:
+    #     for change_type, interval in event.items():
+    #         # Calculate target rate based on the type of event
+    #         if change_type == 'accelerate':
+    #             # Ensure target rate is logically below current rate but not less than 100ms
+    #             target_rate_ms = random.randint(100, min(400, current_rate_ms))
+    #         else:  # 'decelerate'
+    #             # Ensure target rate is logically above current rate but not more than 500ms
+    #             target_rate_ms = random.randint(max(400, current_rate_ms), 500)
+
+    #         print("Changing rate to", target_rate_ms, "within", interval, "seconds")
+    #         change_start_sec = int((interval * 10) + random.randint(0, 8))  # Random start within the window
+    #         while True:
+    #             elapsed_time = time.time() - last_change_time
+    #             if elapsed_time >= change_start_sec and elapsed_time <= change_start_sec + transition_duration:
+    #                 current_rate_ms = calculate_current_rate(current_rate_ms, target_rate_ms, transition_duration, elapsed_time - change_start_sec)
+    #             elif elapsed_time > change_start_sec + transition_duration:
+    #                 last_change_time = time.time()
+    #                 break  # Move to the next change event after completing this transition
+    #             print_at_rate( start_time,current_rate_ms)
+
+# Example execution with user input for total duration
+def main():
+    # print("Dynamic Rate Change Simulation")
+    # total_duration_sec = get_validated_input("Enter the total duration of the simulation in seconds (between 10 and 7200 seconds): ", int, 10, 7200)
+    simulate_dynamic_changes(60)
+
+if __name__ == "__main__":
+    main()
