@@ -281,23 +281,20 @@ def simulate_rate_change(start_rate_ms, target_rate_ms, transition_duration, tot
 # simulate_rate_change(100, 400, 10, 60)
 
 def generate_change_intervals(total_duration_sec, initial_stable_period_sec=10, change_window_size=10):
-    # Calculate the maximum number of 10-second windows available for changes after the initial stable period
     max_changes = (total_duration_sec - initial_stable_period_sec) // change_window_size
-    # Ensure at least one change if the duration allows, but not more than the maximum possible changes
-    num_changes = random.randint(1, max(1, min(max_changes, 5)))  # Adjust '5' as needed to the desired max number of changes
+    num_changes = random.randint(1, max(1, min(max_changes, 5)))  # Limit the number of changes
 
     change_intervals = []
-    # If there are available windows for changes, generate the intervals
     if max_changes > 0:
-        intervals = random.sample(range(2, max_changes + 2), num_changes)
+        intervals = random.sample(range(1, max_changes + 1), num_changes)  # Start range at 1 for clarity
         for interval in intervals:
             change_type = random.choice(['accelerate', 'decelerate'])
-            change_intervals.append({change_type: interval - 1})
+            change_intervals.append({change_type: interval})
     else:
-        # Handle scenario where no changes can be accommodated
         print("Warning: Duration too short for any changes.")
 
     return sorted(change_intervals, key=lambda x: list(x.values())[0])
+
 
 
 def print_at_rate(start_time, current_rate_ms, message="Printing at the machine's rate..."):
@@ -365,65 +362,95 @@ we start at 0 to 10 and total time is 60 seconds
 - acceleration and deceleration are random
 - the transition is exponential using exponential decay formula
 """
-
-
-# Reuse calculate_current_rate, generate_change_intervals, print_at_rate, and get_validated_input as provided
-
-def simulate_dynamic_changes(total_duration_sec=60):
-    # Initialize simulation parameters
-    initial_rate_ms = 1000  # Starting with a slower rate
-    stable_rate_ms = 400  # Target stable rate after initial acceleration
-    transition_duration = 6  # Duration for each rate change
-    initial_stable_period_sec = 10  # Duration to stabilize at the beginning
-
-    # Generate change intervals with types (accelerate/decelerate)
-    change_events = generate_change_intervals(total_duration_sec, initial_stable_period_sec)
-    print(">>>>>>>   Change Events:", change_events)
-
+def simulate_initial_acceleration(transition_duration=6, stable_rate_ms=400, initial_stable_period_sec = 10):
     start_time = time.time()
-    current_rate_ms = initial_rate_ms
-    last_change_time = start_time
+    initial_rate_ms = 1000  # Starting with a slower rate
+    elapsed_time = 0
+    
 
     # Initial acceleration to stable_rate_ms
-    while True:
-        # current_rate_ms = 1000
+    while elapsed_time < initial_stable_period_sec:
         elapsed_time = time.time() - start_time
         if elapsed_time <= transition_duration:
             current_rate_ms = calculate_current_rate(initial_rate_ms, stable_rate_ms, transition_duration, elapsed_time)
         else:
             current_rate_ms = stable_rate_ms
-        if int(elapsed_time) >= 10:
-            print_at_rate(start_time, current_rate_ms)
-            break
-        print_at_rate( start_time,current_rate_ms)
+        print_at_rate(start_time, current_rate_ms)
+    return current_rate_ms
 
-    # # Process each change event
-    # for event in change_events:
-    #     for change_type, interval in event.items():
-    #         # Calculate target rate based on the type of event
-    #         if change_type == 'accelerate':
-    #             # Ensure target rate is logically below current rate but not less than 100ms
-    #             target_rate_ms = random.randint(100, min(400, current_rate_ms))
-    #         else:  # 'decelerate'
-    #             # Ensure target rate is logically above current rate but not more than 500ms
-    #             target_rate_ms = random.randint(max(400, current_rate_ms), 500)
 
-    #         print("Changing rate to", target_rate_ms, "within", interval, "seconds")
-    #         change_start_sec = int((interval * 10) + random.randint(0, 8))  # Random start within the window
-    #         while True:
-    #             elapsed_time = time.time() - last_change_time
-    #             if elapsed_time >= change_start_sec and elapsed_time <= change_start_sec + transition_duration:
-    #                 current_rate_ms = calculate_current_rate(current_rate_ms, target_rate_ms, transition_duration, elapsed_time - change_start_sec)
-    #             elif elapsed_time > change_start_sec + transition_duration:
-    #                 last_change_time = time.time()
-    #                 break  # Move to the next change event after completing this transition
-    #             print_at_rate( start_time,current_rate_ms)
+# Assuming calculate_current_rate and print_at_rate are defined as previously discussed
 
-# Example execution with user input for total duration
-def main():
-    # print("Dynamic Rate Change Simulation")
-    # total_duration_sec = get_validated_input("Enter the total duration of the simulation in seconds (between 10 and 7200 seconds): ", int, 10, 7200)
-    simulate_dynamic_changes(60)
+def simulate_dynamic_changes(total_duration_sec=60):
+    stable_rate_ms = 400  # Target stable rate after initial acceleration
+    transition_duration = 6  # Duration for each rate change
+    initial_stable_period_sec = 10  # Duration to stabilize at the beginning
+    max_acceleration_rate_ms = 100  # Max acceleration rate
+    min_deceleration_rate_ms = 500  # Min deceleration rate
 
-if __name__ == "__main__":
-    main()
+    # Generate change intervals with types (accelerate/decelerate)
+    change_events = generate_change_intervals(total_duration_sec, initial_stable_period_sec)
+    print(">>>>>>> Change Events:", change_events)
+
+    start_time = time.time()
+    current_rate_ms = simulate_initial_acceleration(transition_duration, stable_rate_ms, initial_stable_period_sec)
+    """
+        The subsequent period:
+        - we have to change the rate at given windows such as [{accelerate: 2}, {decelerate: 4}, {accelerate: 5}]
+        - While elaspsed time is less than the total duration - initial_stable_period_sec
+        -      * We check if we are in the window of the change
+        -       === Few Constrains ===
+        -            _ We can only change during a window of 10 seconds.
+        -            _ The change take transition_duration seconds at any second in the window of 10 seconds from 0 to 8
+        -            _ When we haven't reached the max acceleration, we can still accelerate to the max acceleration if the change is an acceleration
+        -            _ When we haven't reached the min deceleration, we can still decelerate to the min deceleration if the change is a deceleration
+        -            _ When accelerating in the deceleration space, from 400ms to 500ms, we go back to 400ms by accelerating. we don't go to 1000ms
+        -            _ When decelerating in the acceleration space, from 100ms to 400ms, we go back to 400ms by decelerating. we don't go to 0ms
+        -            *- If we are in the window of change:
+        -                  *- We check if we should accelerate or decelerate
+        -                  *- We randomly select a number from 0 to 8 where we can start accelerating or decelerating
+        -                  *- We calculate the current rate using the calculate_current_rate function
+        -                  *- We print the rate at the current rate
+        -                  *- We sleep for the current rate
+        -            *- else we print at the current rate:
+    """
+    count = 0
+    while time.time() - start_time < total_duration_sec:
+        elapsed_time = time.time() - start_time
+        for event in change_events:
+            print("Event:", event)
+            if (count := count + 1) < 10:
+                print("Count:", count)
+                time.sleep(1)
+            else:
+                return   
+            # for change_type, interval in event.items():
+                # change_window_start = interval * 10
+                # change_window_end = change_window_start + 8  # Change must start within [0, 8] seconds of the window
+                # # Check if we are within the change window
+                # if change_window_start <= elapsed_time < change_window_end + transition_duration:
+                #     # Determine the target rate based on the type of change and current rate
+                #     if change_type == 'accelerate':
+                #         # Avoid accelerating beyond max rate or if already accelerated
+                #         if current_rate_ms > max_acceleration_rate_ms:
+                #             target_rate_ms = max_acceleration_rate_ms
+                #         else:
+                #             continue  # Skip acceleration if already at or below max acceleration rate
+                #     elif change_type == 'decelerate':
+                #         # Avoid decelerating below min rate or if already decelerated
+                #         if current_rate_ms < min_deceleration_rate_ms:
+                #             target_rate_ms = min_deceleration_rate_ms
+                #         else:
+                #             continue  # Skip deceleration if already at or above min deceleration rate
+                    
+                #     # Calculate and apply the current rate if within transition duration
+                #     transition_elapsed = elapsed_time - change_window_start
+                #     if 0 <= transition_elapsed <= transition_duration:
+                #         current_rate_ms = calculate_current_rate(current_rate_ms, target_rate_ms, transition_duration, transition_elapsed)
+                
+                # print_at_rate(start_time, current_rate_ms)
+
+# This assumes generate_change_intervals is adjusted to generate events as per the new requirements
+
+simulate_dynamic_changes(60)
+
