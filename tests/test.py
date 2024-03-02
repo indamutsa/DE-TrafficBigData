@@ -173,7 +173,6 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 # for coord in coordinates:
 #     print(coord)
 
-
 def simulate_dynamic_journey_fine_grained(start_lat, start_lon, end_lat, end_lon, total_distance_km, total_time_sec):
     current_lat, current_lon = start_lat, start_lon
     time_step_sec = 0.1  # Time step for the simulation, in seconds
@@ -222,9 +221,8 @@ def simulate_dynamic_journey_fine_grained(start_lat, start_lon, end_lat, end_lon
 #                                       400, 60)
 
 
-
-
-
+current_rate_ms = 400
+elapsed_time = 0
 
 def calculate_current_rate(start_rate, target_rate, transition_duration, elapsed_time):
     """
@@ -260,42 +258,14 @@ def calculate_current_rate(start_rate, target_rate, transition_duration, elapsed
 
     return current_rate
 
-
-def simulate_rate_change(start_rate_ms, target_rate_ms, transition_duration, total_duration):
-    start_time = time.time()
-    
-    print("Starting simulation...")
-    while True:
-        elapsed_time = time.time() - start_time
-        if elapsed_time > total_duration:
-            break  # End simulation
-        
-        # Calculate the current rate
-        current_rate = calculate_current_rate(start_rate_ms, target_rate_ms, transition_duration, elapsed_time)
-        
-        # Print the current rate and elapsed time
-        print(f"Elapsed Time: {elapsed_time:.2f}s, Current Rate: {current_rate:.2f}ms")
-        
-        # Adjust sleep duration based on the current rate
-        time.sleep(current_rate / 1000)
-
 # simulate_rate_change(100, 400, 10, 60)
 
-def generate_change_intervals(total_duration_sec, initial_stable_period_sec=10, change_window_size=10, transition_duration=6):
-    max_changes = (total_duration_sec - initial_stable_period_sec) // change_window_size
-    num_changes = random.randint(1, max(1, min(max_changes, 5)))  # Limit the number of changes
+def generate_change_intervals(total_duration_sec):
+    total_windows = total_duration_sec // 10
+    num_changes = [i + 1 for i in range(1, total_windows)]
+    randomized_sample = random.sample(num_changes, random.randint(1, total_windows-1))
 
-    change_intervals = []
-    if max_changes > 0:
-        intervals = random.sample(range(1, max_changes + 1), num_changes)  # Start range at 1 for clarity
-        for interval in intervals:
-            change_type = random.choice(['accelerate', 'decelerate'])
-            change_intervals.append({interval: { "change_type": change_type, "rand_start": (rand_start := (interval * change_window_size) + random.randint(0,8)), "transition_duration": min(((interval + 1) * change_window_size) - rand_start, transition_duration)}})
-    else:
-        print("Warning: Duration too short for any changes.")
-
-    return sorted(change_intervals, key=lambda x: list(x.keys())[0])
-
+    return sorted(randomized_sample)
 
 
 def print_at_rate(start_time, current_rate_ms, message="Printing at the machine's rate..."):
@@ -363,70 +333,115 @@ we start at 0 to 10 and total time is 60 seconds
 - acceleration and deceleration are random
 - the transition is exponential using exponential decay formula
 """
-def simulate_initial_acceleration(transition_duration=6, stable_rate_ms=400, initial_stable_period_sec = 10):
-    start_time = time.time()
-    initial_rate_ms = 1000  # Starting with a slower rate
-    elapsed_time = 0
-    
+def simulate_window_acceleration(current_window, change_windows, transition_duration=6, stable_rate_ms=400, initial_stable_period_sec = 10, change_window_size=10, max_acceleration_rate_ms=100, max_deceleration_rate_ms=500):
+    # Initialize the global elapsed_time variable
+    global current_rate_ms
+    global elapsed_time
 
-    # Initial acceleration to stable_rate_ms
-    while elapsed_time < initial_stable_period_sec:
-        elapsed_time = time.time() - start_time
-        if elapsed_time <= transition_duration:
-            current_rate_ms = calculate_current_rate(initial_rate_ms, stable_rate_ms, transition_duration, elapsed_time)
-        else:
-            current_rate_ms = stable_rate_ms
-        print_at_rate(start_time, current_rate_ms)
-    return current_rate_ms
+    # Initializating the variables
+    start_time = time.time()
+    initial_rate_ms = 1000  # Starting with a slower rate   
+
+
+    if current_window == 1:
+        # Initial acceleration to stable_rate_ms
+        while elapsed_time < initial_stable_period_sec:
+            elapsed_time = int(time.time() - start_time)
+            if elapsed_time <= transition_duration:
+                current_rate_ms = calculate_current_rate(initial_rate_ms, stable_rate_ms, transition_duration, elapsed_time)
+            else:
+                current_rate_ms = stable_rate_ms
+            print_at_rate(start_time, current_rate_ms)
+        return current_rate_ms, elapsed_time
+    else:
+        # Change type: accelerate or decelerate
+        change_type = random.choice(['accelerate', 'decelerate']) if current_window in change_windows else None
+        rand_start = ((current_window - 1) * change_window_size) + random.randint(0,8)
+        transition_duration =  min(((current_window + 1) * change_window_size) - rand_start, transition_duration)
+        window_limit = (current_window) * change_window_size
+        
+        while elapsed_time < window_limit:
+
+            elapsed_time += 1
+            sleep(1)
+
+            if change_type == 'accelerate' and current_window in change_windows:
+                print("Accelerating... at window:", current_window, "Elapsed Time:", elapsed_time, "Random Start:", rand_start, "Transition Duration:", transition_duration, "Current Rate:", current_rate_ms)
+                
+                if current_rate_ms <= stable_rate_ms and elapsed_time == rand_start:
+                    
+                    current_rate_ms = calculate_current_rate(current_rate_ms, max_acceleration_rate_ms, transition_duration, elapsed_time)
+                    
+                    print(f"We are accelerating... from 400ms to 100ms, Elaspesd Time: {elapsed_time}, current_rate_ms: {current_rate_ms}")
+
+                    elapsed_time += current_rate_ms
+                    
+                elif current_rate_ms >= stable_rate_ms and elapsed_time == rand_start:
+                    
+                    current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, elapsed_time)
+                    
+                    print(f"We are accelerating... from 400ms+ to 400ms, Elaspesd Time: {elapsed_time}, current_rate_ms: {current_rate_ms}")
+                    
+                    elapsed_time += current_rate_ms
+                    
+
+            elif change_type == 'decelerate' and current_window in change_windows:
+                print("Decelerating... at window:", current_window, "Elapsed Time:", elapsed_time, "Random Start:", rand_start, "Transition Duration:", transition_duration, "Current Rate:", current_rate_ms)
+                
+                if current_rate_ms <= stable_rate_ms and elapsed_time == rand_start:
+                    
+                    current_rate_ms = calculate_current_rate(current_rate_ms, max_acceleration_rate_ms, transition_duration, elapsed_time)
+
+                    print(f"We are decelerating... from 100ms to 400ms, Elaspesd Time: {elapsed_time}, current_rate_ms: {current_rate_ms}")
+
+                    elapsed_time += current_rate_ms
+                    
+                elif current_rate_ms >= stable_rate_ms and elapsed_time == rand_start:
+                    current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, elapsed_time)
+
+                    print(f"We are decelerating... from 400ms to 500ms, Elaspesd Time: {elapsed_time}, current_rate_ms: {current_rate_ms}")
+
+                    elapsed_time += current_rate_ms
+                    
+                    # current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, random_start)    
+
+            # print("About to loop using the current rate from exponentila decay...")
+            # print(f"Change Type: {change_type}, Random Start: {rand_start}, Transition Duration: {transition_duration}, Elapsed Time: {elapsed_time}, window_limit: {window_limit}, Current Window: {current_window}")
+
+        return current_rate_ms, elapsed_time
 
 
 def get_event(window, change_events):
-    """Retrieve the event type ('accelerate' or 'decelerate') for the given window."""
-    return next((event for event in change_events if list(event.keys())[0] == window), None)
+    try:
+        """Retrieve the event type ('accelerate' or 'decelerate') for the given window."""
+        return next((event for event in change_events if list(event.keys())[0] == window), None)
+    except Exception as e:
+        print("Error:", e)
+        return None
 
-def calculate_transition_details(current_window, elapsed_time ,window_duration=10, max_transition_duration=6):
-    """
-    Calculate and return the actual start time within the window and the adjusted transition duration.
-    
-    Parameters:
-    - window_start_sec: The start second of the change window.
-    - window_duration: The total duration of the window (default 10 seconds).
-    - max_transition_duration: The maximum duration for the transition (default 6 seconds).
-    
-    Returns:
-    - A tuple containing:
-        - actual_start_sec: The calculated start second for the change within the window.
-        - adjusted_transition_duration: The duration for the transition, adjusted to fit within the window.
-    """
-    remaining_window_duration =  ((current_window + 1) * window_duration) - elapsed_time
-    adjusted_transition_duration = min(max_transition_duration, remaining_window_duration)
-    actual_start_sec = (current_window * window_duration) + adjusted_transition_duration
-
-    return actual_start_sec, adjusted_transition_duration
-
-
-
-# Assuming calculate_current_rate and print_at_rate are defined as previously discussed
 def simulate_dynamic_changes(total_duration_sec=60):
-    stable_rate_ms = 400  # Target stable rate after initial acceleration
-    transition_duration = 6  # Duration for each rate change
-    initial_stable_period_sec = 10  # Duration to stabilize at the beginning
-    max_acceleration_rate_ms = 100  # Max acceleration rate
-    max_deceleration_rate_ms = 500  # Min deceleration rate
+    global elapsed_time
+
     start_time = time.time()  # Start time of the simulation
-    last_change_end = start_time + initial_stable_period_sec  # Time when the last change ended
+    window_change_size = 10  # The size of the window for change in seconds
 
+    # Generate change intervals 
+    change_events = generate_change_intervals(total_duration_sec)
 
-    # Generate change intervals with types (accelerate/decelerate)
-    change_events = generate_change_intervals(total_duration_sec, initial_stable_period_sec)
-    # change_events = [{1: 'decelerate'}]
-    key_change_events = [list(key.keys())[0] for key in change_events]
     print(">>>>>>> Change Events:", change_events)
-    print(">>>>>>> Key Change Events:", key_change_events)
-    
+    current_window = 1
+    current_rate_ms = 0
+    elapsed_time = 0
+    print(f">>===>: Simulating window acceleration... -->: {current_window}, Elasped Time: {elapsed_time}, Current Rate: {current_rate_ms}")
 
-    
-    current_rate_ms = simulate_initial_acceleration(transition_duration, stable_rate_ms, initial_stable_period_sec)
+    while True:
+        if elapsed_time > total_duration_sec - 10:
+            break
+        current_rate_ms, elapsed_time = simulate_window_acceleration(current_window, change_events)
+        current_window = (elapsed_time // window_change_size) + 1
+        print(f">>===>: Simulating window acceleration... -->: {current_window}, Elasped Time: {elapsed_time}, Current Rate: {current_rate_ms}")
+        # sleep(5)
+
     """
         The subsequent period:
         - we have to change the rate at given windows such as [{accelerate: 2}, {decelerate: 4}, {accelerate: 5}]
@@ -447,7 +462,7 @@ def simulate_dynamic_changes(total_duration_sec=60):
         -                  *- We sleep for the current rate
         -            *- else we print at the current rate:
     """
-    n = 0
+    # event = get_event(1, change_events)
 
     # while True:
     #     elapsed_time = time.time() - start_time
@@ -458,39 +473,41 @@ def simulate_dynamic_changes(total_duration_sec=60):
     #     # Let us determine the current window based on elapsed time
     #     current_window = int(elapsed_time // 10)
     #     event = get_event(current_window, change_events)
-    #     actual_start_sec, adjusted_transition_duration = calculate_transition_details(int(elapsed_time))
-    #     print(f"Actual Start: {actual_start_sec}, Adjusted Transition: {adjusted_transition_duration}, Elapsed Time: {elapsed_time} Event: {event} Current Window: {current_window}")
 
-    #     # # Check if we are in the window of change
-    #     # if ( n := elapsed_time // 10) in key_change_events:
-    #     #     print(f"We are in the window of change: {n}, --> {getEvent(n, change_events)}")
-    #     #     # We check if we should accelerate or decelerate
-    #     #     change_type = getEvent(n, change_events)
-    #     #     print(f"Change Type: {change_type}")
+    #     if event:
+    #         print(f"Actual Start: {event[current_window]['rand_start']}, Elapsed Time: {elapsed_time}, transition_duration: {event[current_window]['transition_duration']}, Event: {event[current_window]['change_type']}, Current Window: {current_window}")
 
-    #     #     # We randomly select a number from 0 to 8 where we can start accelerating or decelerating
-    #     #     print(f"Random Start: {random_start}")
+        # # Check if we are in the window of change
+        # if ( n := elapsed_time // 10) in key_change_events:
+        #     print(f"We are in the window of change: {n}, --> {getEvent(n, change_events)}")
+        #     # We check if we should accelerate or decelerate
+        #     change_type = getEvent(n, change_events)
+        #     print(f"Change Type: {change_type}")
 
-    #     #     # We calculate the current rate using the calculate_current_rate function
-    #     #     if change_type == 'accelerate':
-    #     #         # Accelerating from 400ms to 100ms
-    #     #         if current_rate_ms < stable_rate_ms and current_rate_ms > max_acceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
-    #     #             print("We are accelerating... from 400ms to 100ms, Elaspesd Time:", elapsed_time)
-    #     #         # Accelerating from 500ms to 400ms
-    #     #         elif current_rate_ms > stable_rate_ms and current_rate_ms < max_deceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
-    #     #             print("We are accelerating... from 400ms+ to 400ms, Elaspesd Time:", elapsed_time)
-    #     #             # current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, random_start)
-    #     #     elif change_type == 'decelerate' and elapsed_time == random_start:
-    #     #         # Decelerating from 100ms to 400ms
-    #     #         if current_rate_ms < stable_rate_ms and current_rate_ms > max_acceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
-    #     #             print("We are decelerating... from 100ms to 400ms, Elaspesd Time:", elapsed_time)
-    #     #         # Decelerating from 400ms to 500ms
-    #     #         elif current_rate_ms > stable_rate_ms and current_rate_ms < max_deceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
-    #     #             print("We are decelerating... from 400ms to 500ms, Elaspesd Time:", elapsed_time)
-    #     #             # current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, random_start)
+        #     # We randomly select a number from 0 to 8 where we can start accelerating or decelerating
+        #     print(f"Random Start: {random_start}")
 
+        #     # We calculate the current rate using the calculate_current_rate function
+        #     if change_type == 'accelerate':
+        #         # Accelerating from 400ms to 100ms
+        #         if current_rate_ms < stable_rate_ms and current_rate_ms > max_acceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
+        #             print("We are accelerating... from 400ms to 100ms, Elaspesd Time:", elapsed_time)
+        #         # Accelerating from 500ms to 400ms
+        #         elif current_rate_ms > stable_rate_ms and current_rate_ms < max_deceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
+        #             print("We are accelerating... from 400ms+ to 400ms, Elaspesd Time:", elapsed_time)
+        #             # current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, random_start)
+        #     elif change_type == 'decelerate' and elapsed_time == random_start:
+        #         # Decelerating from 100ms to 400ms
+        #         if current_rate_ms < stable_rate_ms and current_rate_ms > max_acceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
+        #             print("We are decelerating... from 100ms to 400ms, Elaspesd Time:", elapsed_time)
+        #         # Decelerating from 400ms to 500ms
+        #         elif current_rate_ms > stable_rate_ms and current_rate_ms < max_deceleration_rate_ms and elapsed_time == random_start(elapsed_time, start_time):
+        #             print("We are decelerating... from 400ms to 500ms, Elaspesd Time:", elapsed_time)
+        #             # current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, random_start)
         
-    #     sleep(5)
+        # print("Looping...")
+        
+        # sleep(5)
  
 
 simulate_dynamic_changes(60)
