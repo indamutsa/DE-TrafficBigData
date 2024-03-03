@@ -11,21 +11,18 @@ start_time = 0
 def calculate_current_rate(start_rate, target_rate, transition_duration, elapsed_time):
     if transition_duration <= 0:
         return target_rate
+    
     # Calculate the rate of change
     rate_of_change = math.log(target_rate / start_rate) / transition_duration
+    
     # Calculate the current rate based on elapsed time
     current_rate = start_rate * math.exp(rate_of_change * elapsed_time)
 
     # Ensure the current rate does not overshoot in either direction
     if start_rate < target_rate:
         current_rate = min(current_rate, target_rate)
-        # print("Current Rate>>>: ", current_rate)
     else:
         current_rate = max(current_rate, target_rate)
-        # print("Current Rate: ", current_rate, target_rate)
-
-    # Optional: Adjust to integer if necessary
-    # current_rate = int(current_rate)
     
     return current_rate
 
