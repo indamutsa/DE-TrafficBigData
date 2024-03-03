@@ -1,6 +1,4 @@
-import sys
 import time
-from time import sleep
 import random
 import math
 
@@ -155,10 +153,7 @@ def get_event(window, change_events):
         return None
 
 def simulate_dynamic_changes(total_duration_sec=60):
-    global elapsed_time
-    global current_window
-    global current_rate_ms
-    global start_time
+    global elapsed_time, current_window, current_rate_ms, start_time
 
     # Initializating the variables
     start_time = time.time()
