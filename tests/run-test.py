@@ -47,14 +47,9 @@ def print_at_rate( transition_duration, change_type,message="Printing at the mac
 
 def simulate_window_acceleration( start_time,change_windows, transition_duration=6, stable_rate_ms=400, initial_stable_period_sec = 10, change_window_size=10, max_acceleration_rate_ms=100, max_deceleration_rate_ms=500):
     # Initialize the global elapsed_time variable
-    global current_rate_ms
-    global elapsed_time
-    global current_window
-
-
+    global current_rate_ms, elapsed_time, current_window
 
     initial_rate_ms = 1000  # Starting with a slower rate   
-
 
     if current_window == 0:
         # Initial acceleration to stable_rate_ms
@@ -65,9 +60,7 @@ def simulate_window_acceleration( start_time,change_windows, transition_duration
             else:
                 current_rate_ms = stable_rate_ms
             print_at_rate(transition_duration, "accelerate")
-        # return current_rate_ms, elapsed_time
     else:
-        # Change type: accelerate or decelerate
         updated_current_window = current_window + 1
         change_type = random.choice(['accelerate', 'decelerate']) if updated_current_window in change_windows else None
 
@@ -75,74 +68,41 @@ def simulate_window_acceleration( start_time,change_windows, transition_duration
         transition_duration =  min(((updated_current_window) * change_window_size) - rand_start, transition_duration)
         iteration_stop = rand_start + transition_duration
         window_limit = (updated_current_window) * change_window_size
-        # change_type = random.choice(['accelerate', 'decelerate'])
-        # change_windows = [2, 3, 4, 5, 6]
-        # rand_start = 12
-        print("Change Type: ", change_type, " Rand Start, Stop: ", rand_start, iteration_stop)
 
-        # print(f"Change Type: {change_type} | Rand_start: {rand_start} | Stopping at {iteration_stop} | Transition Duration: {transition_duration} | Elapsed Time: {elapsed_time} | Window Limit: {window_limit}")
         a = False
 
         while elapsed_time < window_limit:
 
             elapsed_time = time.time() - start_time
-            # inner_lapsed_time = elapsed_time % 10 
 
-            if change_type == 'accelerate' and updated_current_window in change_windows:               
+            if change_type == 'accelerate' and updated_current_window in change_windows:                             
                 if elapsed_time >= rand_start and elapsed_time <= iteration_stop:
-                    
+                    if a == False:
+                        inner_start_time = time.time()
+                        a = True                    
                     if  current_rate_ms <= stable_rate_ms:
-                        if a == False:
-                            inner_start_time = time.time()
-                            a = True
                             
                         inner_lapsed_time = time.time() - inner_start_time 
-                        # print("Inner Lapsed Time: ", inner_lapsed_time)
-
                         current_rate_ms = calculate_current_rate(current_rate_ms, max_acceleration_rate_ms, transition_duration, inner_lapsed_time) 
-                        # print("***1", current_rate_ms)
-
-                       
                     else:
-                        if a == False:
-                            inner_start_time = time.time()
-                            a = True
-                            
                         inner_lapsed_time = time.time() - inner_start_time
-                        # print("Inner Lapsed Time: ", inner_lapsed_time) 
                         current_rate_ms = calculate_current_rate( current_rate_ms, stable_rate_ms, transition_duration, inner_lapsed_time)
-                        # print("***2", current_rate_ms)
-
-                else:
-                    current_rate_ms = current_rate_ms
+ 
             elif change_type == 'decelerate' and updated_current_window in change_windows:
                 if elapsed_time >= rand_start and elapsed_time <= iteration_stop:
-                    
+                    if a == False:
+                        inner_start_time = time.time()
+                        a = True
                     if current_rate_ms >= stable_rate_ms:
-                        if a == False:
-                            inner_start_time = time.time()
-                            a = True
-                            
                         inner_lapsed_time = time.time() - inner_start_time
-                        # print("Inner Lapsed Time: ", inner_lapsed_time)                        
                         current_rate_ms = calculate_current_rate(current_rate_ms, max_deceleration_rate_ms, transition_duration, inner_lapsed_time) 
-                        # print("***3", current_rate_ms)
                     
-                    else:
-
-                        if a == False:
-                            inner_start_time = time.time()
-                            a = True
-                            
+                    else:                        
                         inner_lapsed_time = time.time() - inner_start_time
-                        # print("Inner Lapsed Time: ", inner_lapsed_time) 
                         current_rate_ms = calculate_current_rate(current_rate_ms, stable_rate_ms, transition_duration, inner_lapsed_time)
-                        # print("***4", current_rate_ms)
 
-            # print(f"Change Type: {change_type} | Rand_start: {rand_start} | Transition Duration: {transition_duration} | Elapsed Time: {elapsed_time} | Window Limit: {window_limit}")
             print_at_rate(transition_duration, change_type)
-        # sys.exit(0)    
-        # return current_rate_ms, elapsed_time
+
 
 
 def get_event(window, change_events):
@@ -164,9 +124,7 @@ def simulate_dynamic_changes(total_duration_sec=60):
     change_events = generate_change_intervals(total_duration_sec)
 
     print(">>>>>>> Change Events:", change_events)
-    # current_window = 1
-    # current_rate_ms = 0
-    # elapsed_time = 0
+
     print(f">>===>: Simulating window acceleration... -->: {current_window}, Elasped Time: {elapsed_time}, Current Rate: {current_rate_ms}")
 
     while True:
