@@ -114,27 +114,6 @@ def get_event(window, change_events):
         print("Error:", e)
         return None
 
-def simulate_dynamic_changes(total_duration_sec=60,  window_size = 10):
-    global elapsed_time, current_window, current_rate_ms, start_time
 
-    # Initializating the variables
-    start_time = time.time()
-
-    # Generate change intervals 
-    change_events = generate_change_intervals(total_duration_sec)
-
-    print(">>>>>>> Change Events:", change_events)
-
-    print(f">>===>: Simulating window acceleration... -->: {current_window}, Elasped Time: {elapsed_time}, Current Rate: {current_rate_ms}")
-
-    while True:
-        if elapsed_time > total_duration_sec: 
-            break
-        simulate_window_acceleration(start_time, change_events)
-        current_window = (elapsed_time // window_size)
-        print(f">>===>: Simulating window acceleration... -->: {current_window}, Elasped Time: {elapsed_time}, Current Rate: {current_rate_ms}")
- 
-
-simulate_dynamic_changes(60)
 
 
