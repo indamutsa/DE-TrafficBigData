@@ -114,7 +114,7 @@ def generate_movement_with_rate(start_coord, target_coord, total_time_sec):
     total_distance_km = haversine_distance(start_coord, target_coord)
     
     # Calculate required speed in km/s to cover the distance within the given time
-    speed_kms = total_distance_km / total_time_sec
+    speed_kms = total_distance_km / total_time_sec 
     
     # Calculate the bearing from the current position to the target position
     bearing = calculate_bearing(start_coord, target_coord)
@@ -126,7 +126,7 @@ def generate_movement_with_rate(start_coord, target_coord, total_time_sec):
     new_lat, new_lon = update_position(start_coord, distance_covered_km, bearing)
     
     # Return the new position and the speed rate in km/s
-    return new_lat, new_lon, speed_kms
+    return new_lat, new_lon
 
 print(generate_movement_with_rate((47.608013, -122.335167), (46.7319, -117.1542), 40))
 
