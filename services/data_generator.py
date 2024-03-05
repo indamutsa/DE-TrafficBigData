@@ -4,6 +4,7 @@ from models.vehicle import Vehicle
 from utilities.coordinates import calculate_distance, calculate_increment
 from config.settings import SEATTLE_COORDINATES, UNIVERSITY_COORDINATES, VEHICLE_TOPIC, GPS_TOPIC, TRAFFIC_TOPIC, WEATHER_TOPIC, EMERGENCY_TOPIC
 from services.kafka_producer import KafkaProducer
+from utilities.dynamic_simulator import generate_change_intervals, simulate_window_acceleration
 
 def simulate_journey(vehicle_id):
     """
@@ -65,3 +66,25 @@ def simulate_journey(vehicle_id):
         print("Data sent to Kafka")
 
         time.sleep(random.randint(1, 3)) # Sleep for a random number of seconds between 1 and 3
+
+# ------------------------------
+
+def simulate_dynamic_changes(total_duration_sec=60,  window_size = 10):
+    global elapsed_time, current_window, current_rate_ms, start_time
+
+    # Initializating the variables
+    start_time = time.time()
+
+    # Generate change intervals 
+    change_events = generate_change_intervals(total_duration_sec)
+
+    print(">>>>>>> Change Events:", change_events)
+
+    print(f">>===>: Simulating window acceleration... -->: {current_window}, Elasped Time: {elapsed_time}, Current Rate: {current_rate_ms}")
+
+    while True:
+        if elapsed_time > total_duration_sec: 
+            break
+        simulate_window_acceleration(start_time, change_events)
+        current_window = (elapsed_time // window_size)
+        print(f">>===>: Simulating window acceleration... -->: {current_window}, Elasped Time: {elapsed_time}, Current Rate: {current_rate_ms}")
